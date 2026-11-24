@@ -262,7 +262,7 @@ class MainActivity : Activity() {
         col.addView(text("Hand gestures (defaults)", 18f, bold = true))
         col.addView(text(
             "- Point with one finger: moves the pointer\n" +
-                "- Push the pointing finger toward the camera: click\n" +
+                "- Hold the pointing finger still for 1 s: click (a green ring fills up)\n" +
                 "- Thumb and index touching, then spread: zoom in (reverse: zoom out)\n" +
                 "- Thumb and index apart, twist: rotate\n" +
                 "- Open palm, swipe up / down: scroll\n" +

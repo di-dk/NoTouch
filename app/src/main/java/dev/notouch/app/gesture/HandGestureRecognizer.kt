@@ -10,7 +10,7 @@ enum class HandPose { PALM, PEACE, FIST, POINT, PINCH, OTHER }
  * Turns 21 hand landmarks per frame (MediaPipe layout, upright + mirrored) into commands.
  *
  *  - Point (index only)            -> moves the cursor
- *  - Push the pointing finger toward the camera (hand grows quickly) -> click where the cursor was
+ *  - Hold the pointing finger still for a second     -> click there (progress shown on the cursor)
  *  - Thumb + index touch then spread / spread then touch -> zoom in / zoom out
  *  - Thumb + index held apart and twisted                -> rotate clockwise / counterclockwise
  *  - Open palm, swipe up/down/left -> scroll / swipe on screen
@@ -42,10 +42,14 @@ class HandGestureRecognizer {
     var debug = ""
         private set
 
-    private val scaleHistory = ArrayDeque<Pair<Long, Float>>()
     private val pinchHistory = ArrayDeque<Pair<Long, Float>>()
-    private var lastPushAt = Long.MIN_VALUE / 2
-    private var growth = 1f
+    private var dwellAnchor: Pt? = null
+    private var dwellSince = 0L
+    private var dwellFired = false
+
+    /** 0..1 progress towards a hold-still click, for the cursor ring. */
+    var dwellProgress = 0f
+        private set
     private val angleHistory = ArrayDeque<Triple<Long, Float, Float>>() // time, angle (rad), pinch ratio
     private var lastZoomAt = Long.MIN_VALUE / 2
     private var lastRotateAt = Long.MIN_VALUE / 2
@@ -60,7 +64,8 @@ class HandGestureRecognizer {
         smoother.reset()
         cursorHistory.clear()
         palmTrail.clear()
-        scaleHistory.clear()
+        dwellAnchor = null
+        dwellProgress = 0f
         pinchHistory.clear()
         homeTrigger.reset()
         recentsTrigger.reset()
@@ -123,22 +128,25 @@ class HandGestureRecognizer {
             smoother.reset()
             cursorHistory.clear()
         }
-        // --- click: the pointing finger is pushed toward the camera, so the hand quickly looks bigger ---
-        if (pose == HandPose.POINT) {
-            scaleHistory.addLast(t to scale)
-            while (scaleHistory.isNotEmpty() && t - scaleHistory.first().first > PUSH_WINDOW_MS) scaleHistory.removeFirst()
-            val smallest = scaleHistory.minOf { it.second }
-            growth = scale / smallest
-            val before = positionAt(t - PUSH_WINDOW_MS)
-            val travel = if (before != null && cursor != null) before.dist(cursor) else 0f
-            if (scale >= PUSH_RATIO * smallest && travel <= PUSH_MAX_TRAVEL && t - lastPushAt > PUSH_COOLDOWN_MS) {
-                bindings.resolve(GestureEvent.PUSH_CLICK, positionAt(t - PUSH_LOOKBACK_MS) ?: cursor)?.let { commands += it }
-                lastPushAt = t
-                scaleHistory.clear()
+        // --- click: hold the pointing finger still ------------------------------------------------
+        dwellProgress = 0f
+        val shown = cursor
+        if (pose == HandPose.POINT && shown != null) {
+            val anchor = dwellAnchor
+            if (anchor == null || anchor.dist(shown) > DWELL_RADIUS) {
+                dwellAnchor = shown
+                dwellSince = t
+                dwellFired = false
+            } else if (!dwellFired) {
+                dwellProgress = ((t - dwellSince) / DWELL_MS.toFloat()).coerceAtMost(1f)
+                if (t - dwellSince >= DWELL_MS) {
+                    bindings.resolve(GestureEvent.DWELL_CLICK, anchor)?.let { commands += it }
+                    dwellFired = true // no repeat until the pointer leaves the radius
+                    dwellProgress = 0f
+                }
             }
         } else {
-            scaleHistory.clear()
-            growth = 1f
+            dwellAnchor = null
         }
 
         // --- zoom: thumb and index touch then open (zoom in) or open then touch (zoom out) ---------------
@@ -244,8 +252,8 @@ class HandGestureRecognizer {
             bindings.resolve(GestureEvent.FIST_HOLD)?.let { commands += it }
         }
 
-        debug = "pose=$pose ratio=${"%.2f".format(pinchRatio)} grow=${"%.2f".format(growth)} fingers=${if (index) "I" else "-"}${if (middle) "M" else "-"}${if (ring) "R" else "-"}${if (pinky) "P" else "-"}"
-        return Output(cursor, commands)
+        debug = "pose=$pose ratio=${"%.2f".format(pinchRatio)} fingers=${if (index) "I" else "-"}${if (middle) "M" else "-"}${if (ring) "R" else "-"}${if (pinky) "P" else "-"}"
+        return Output(cursor, commands, dwellProgress)
     }
 
     /** Eight 45-degree sectors, so a flick in any direction maps to something (image space: y grows downwards). */
@@ -298,11 +306,8 @@ class HandGestureRecognizer {
         const val MIN_PINCH_REACH = 1.1f
         const val MARGIN_X = 0.15f
         const val MARGIN_Y = 0.20f
-        const val PUSH_WINDOW_MS = 300L
-        const val PUSH_LOOKBACK_MS = 250L
-        const val PUSH_RATIO = 1.18f
-        const val PUSH_MAX_TRAVEL = 0.15f
-        const val PUSH_COOLDOWN_MS = 700L
+        const val DWELL_MS = 1000L
+        const val DWELL_RADIUS = 0.05f
         const val ZOOM_WINDOW_MS = 900L
         const val DROPOUT_GRACE_MS = 200L
         const val POSE_FLICKER_GRACE_MS = 250L

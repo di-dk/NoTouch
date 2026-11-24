@@ -24,7 +24,7 @@ enum class MediaKind { PLAY_PAUSE, NEXT, PREVIOUS }
 
 /** What a recogniser saw. Each event is mapped to a [Command] (or nothing) through [Bindings]. */
 enum class GestureEvent {
-    PUSH_CLICK, ZOOM_IN, ZOOM_OUT, ROTATE_CW, ROTATE_CCW, PALM_SWIPE_UP, PALM_SWIPE_DOWN, PALM_SWIPE_LEFT, PALM_SWIPE_RIGHT, PALM_HOLD, FIST_HOLD,
+    DWELL_CLICK, ZOOM_IN, ZOOM_OUT, ROTATE_CW, ROTATE_CCW, PALM_SWIPE_UP, PALM_SWIPE_DOWN, PALM_SWIPE_LEFT, PALM_SWIPE_RIGHT, PALM_HOLD, FIST_HOLD,
     TWO_FINGER_SWIPE_UP, TWO_FINGER_SWIPE_DOWN, TWO_FINGER_SWIPE_LEFT, TWO_FINGER_SWIPE_RIGHT,
     TWO_FINGER_SWIPE_UP_LEFT, TWO_FINGER_SWIPE_UP_RIGHT, TWO_FINGER_SWIPE_DOWN_LEFT, TWO_FINGER_SWIPE_DOWN_RIGHT,
     MOUTH_OPEN, BROWS_RAISED, SMILE_HOLD, PUCKER_HOLD, BLINK_HOLD,
@@ -46,7 +46,8 @@ sealed interface Command {
 }
 
 /** [cursor] is a normalized screen position, or null when no cursor should be shown. */
-data class Output(val cursor: Pt?, val commands: List<Command>) {
+/** [dwell] is 0..1 progress towards a hold-still click, for drawing feedback on the cursor. */
+data class Output(val cursor: Pt?, val commands: List<Command>, val dwell: Float = 0f) {
     companion object {
         val NONE = Output(null, emptyList())
     }

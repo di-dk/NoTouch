@@ -244,7 +244,7 @@ class CameraGestureService : LifecycleService() {
             }
 
             val out = engine.process(t, handPts, faceFrame)
-            NoTouchAccessibilityService.instance?.apply(out.cursor, out.commands)
+            NoTouchAccessibilityService.instance?.apply(out.cursor, out.commands, out.dwell)
             if (handPts != null && t - lastFeatureLogAt >= 200) {
                 lastFeatureLogAt = t
                 Log.d(TAG, "features ${engine.handDebug}")

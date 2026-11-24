@@ -32,7 +32,7 @@ object ActionCatalog {
     fun indexOf(command: Command?): Int = actions.indexOfFirst { it.second == command }.coerceAtLeast(0)
 
     val handGestures: List<Pair<GestureEvent, String>> = listOf(
-        GestureEvent.PUSH_CLICK to "Push pointing finger toward the camera (click)",
+        GestureEvent.DWELL_CLICK to "Hold the pointing finger still (click)",
         GestureEvent.ZOOM_IN to "Thumb and index touching, then spread apart",
         GestureEvent.ZOOM_OUT to "Thumb and index apart, then touch together",
         GestureEvent.ROTATE_CW to "Thumb and index apart, twist clockwise",

@@ -18,7 +18,7 @@ NoTouch is an Android accessibility service. It watches the front camera with [M
 
 ## Features
 
-- **Hand mode**: point to move a cursor, push the finger forward to click, pinch and spread to zoom, twist to rotate, swipe with two fingers or an open palm.
+- **Hand mode**: point to move a cursor, hold still to click, pinch and spread to zoom, twist to rotate, swipe with two fingers or an open palm.
 - **Face and head mode**: move your head to move the cursor, then open your mouth, raise eyebrows, smile, pucker or blink to trigger actions.
 - **Both mode** combines the two.
 - **Media and volume**: bind any gesture to play/pause, next, previous or volume.
@@ -36,7 +36,7 @@ NoTouch is an Android accessibility service. It watches the front camera with [M
 | Gesture | Action |
 |---|---|
 | Point with index finger | Move cursor |
-| Push the pointing finger quickly toward the camera | Click where the pointer was |
+| Hold the pointing finger still for about 1 s | Click there (a green ring fills up) |
 | Thumb and index touching, then spread apart | Zoom in |
 | Thumb and index apart, then touch together | Zoom out |
 | Thumb and index apart, twist clockwise or counterclockwise | Rotate |

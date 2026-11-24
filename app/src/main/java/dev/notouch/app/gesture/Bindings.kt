@@ -27,7 +27,7 @@ class Bindings(private val map: Map<GestureEvent, Command>) {
     companion object {
         val DEFAULT = Bindings(
             mapOf(
-                GestureEvent.PUSH_CLICK to Command.Tap(null),
+                GestureEvent.DWELL_CLICK to Command.Tap(null),
                 GestureEvent.ZOOM_IN to Command.Zoom(zoomIn = true, at = null),
                 GestureEvent.ZOOM_OUT to Command.Zoom(zoomIn = false, at = null),
                 GestureEvent.ROTATE_CW to Command.Rotate(clockwise = true, at = null),

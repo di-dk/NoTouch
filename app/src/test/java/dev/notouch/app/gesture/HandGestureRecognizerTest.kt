@@ -71,8 +71,7 @@ class HandGestureRecognizerTest {
 
     private val still = TestHands.hand(Shape.POINT, cx = 0.4f)
 
-    private fun pushFrames(from: Float, to: Float, n: Int) =
-        List(n) { TestHands.pushed(still, from + (to - from) * (it + 1) / n) }
+    private val dwellFrames = (1000 / 33) + 3 // a little over one second
 
     @Test
     fun pinchNoLongerClicks() {
@@ -82,29 +81,46 @@ class HandGestureRecognizerTest {
     }
 
     @Test
-    fun pushingTheFingerForwardClicksWhereThePointerWas() {
+    fun holdingThePointerStillClicksThere() {
         val rec = HandGestureRecognizer()
-        val (_, t) = run(rec, repeat(still, 10))
-        val cursorBefore = rec.process(t, still).cursor!!
-        val (cmds, _) = run(rec, pushFrames(1f, 1.3f, 6), t + frameMs)
+        val (cmds, _) = run(rec, repeat(still, dwellFrames))
         val taps = cmds.filterIsInstance<Command.Tap>()
         assertEquals(1, taps.size)
-        assertEquals(cursorBefore.x, taps[0].at!!.x, 0.03f)
-        assertEquals(cursorBefore.y, taps[0].at!!.y, 0.03f)
+        val cursor = rec.process(99999, still).cursor!!
+        assertEquals(cursor.x, taps[0].at!!.x, 0.02f)
+        assertEquals(cursor.y, taps[0].at!!.y, 0.02f)
     }
 
     @Test
-    fun aSlowApproachDoesNotClick() {
-        val rec = HandGestureRecognizer()
-        val (cmds, _) = run(rec, repeat(still, 5) + pushFrames(1f, 1.3f, 60))
+    fun noClickBeforeAFullSecond() {
+        val (cmds, _) = run(HandGestureRecognizer(), repeat(still, (800 / 33)))
         assertTrue(cmds.none { it is Command.Tap })
     }
 
     @Test
-    fun oneClickPerPush() {
+    fun oneClickPerHoldAndAnotherAfterMovingAway() {
         val rec = HandGestureRecognizer()
-        val (cmds, _) = run(rec, repeat(still, 10) + pushFrames(1f, 1.3f, 6) + List(30) { TestHands.pushed(still, 1.3f) })
-        assertEquals(1, cmds.filterIsInstance<Command.Tap>().size)
+        val away = TestHands.hand(Shape.POINT, cx = 0.6f)
+        val (cmds, _) = run(rec, repeat(still, dwellFrames * 2) + repeat(away, dwellFrames))
+        assertEquals("one click while holding, one more after moving", 2, cmds.filterIsInstance<Command.Tap>().size)
+    }
+
+    @Test
+    fun movingTheFingerRestartsTheCountdown() {
+        val rec = HandGestureRecognizer()
+        val wobbling = (0 until dwellFrames * 2).map { TestHands.hand(Shape.POINT, cx = if (it % 20 < 10) 0.35f else 0.55f) }
+        assertTrue(run(rec, wobbling).first.none { it is Command.Tap })
+    }
+
+    @Test
+    fun dwellProgressFillsThenResets() {
+        val rec = HandGestureRecognizer()
+        var t = 0L
+        var half = 0f
+        repeat(16) { half = rec.process(t, still).dwell; t += frameMs } // ~0.5 s
+        assertTrue("about halfway, was $half", half in 0.3f..0.7f)
+        repeat(dwellFrames) { rec.process(t, still); t += frameMs }
+        assertEquals(0f, rec.process(t, TestHands.hand(Shape.FIST)).dwell, 0f)
     }
 
     @Test

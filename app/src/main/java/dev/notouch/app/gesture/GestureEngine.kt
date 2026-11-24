@@ -52,6 +52,6 @@ class GestureEngine(var mode: Mode = Mode.BOTH) {
                 else -> commands += c
             }
         }
-        return Output(cursor, commands)
+        return Output(cursor, commands, if (handPresent) handOut.dwell else 0f)
     }
 }

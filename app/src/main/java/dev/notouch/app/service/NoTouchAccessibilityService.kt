@@ -107,8 +107,9 @@ class NoTouchAccessibilityService : AccessibilityService() {
     }
 
     /** Called from the camera thread; hops to the main thread. */
-    fun apply(cursor: Pt?, commands: List<Command>) {
+    fun apply(cursor: Pt?, commands: List<Command>, dwell: Float = 0f) {
         main.post {
+            cursorView?.dwell = dwell
             updateCursor(cursor)
             commands.forEach(::execute)
         }
@@ -275,6 +276,22 @@ class NoTouchAccessibilityService : AccessibilityService() {
             color = 0x66FFFFFF
         }
 
+        private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeWidth = 5f * context.resources.displayMetrics.density
+            color = 0xFF00E676.toInt()
+        }
+
+        /** 0..1 progress of a hold-still click; drawn as a green arc around the ring. */
+        var dwell = 0f
+            set(v) {
+                if (v != field) {
+                    field = v
+                    invalidate()
+                }
+            }
+
         override fun onDraw(canvas: Canvas) {
             val cx = width / 2f
             val cy = height / 2f
@@ -282,6 +299,9 @@ class NoTouchAccessibilityService : AccessibilityService() {
             canvas.drawCircle(cx, cy, r, halo)
             canvas.drawCircle(cx, cy, r, ring)
             canvas.drawCircle(cx, cy, r / 4f, dot)
+            if (dwell > 0f) {
+                canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, 360f * dwell, false, progressPaint)
+            }
         }
     }
 
