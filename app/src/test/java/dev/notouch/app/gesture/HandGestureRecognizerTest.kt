@@ -171,6 +171,23 @@ class HandGestureRecognizerTest {
     }
 
     @Test
+    fun twoFingerFlicksWorkInAllEightDirections() {
+        fun two(dx: Float, dy: Float, frames: Int = 6) = swipe(dx, dy, frames = frames, shape = Shape.PEACE)
+        val d = 0.21f // diagonal components of a 0.3 flick
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.UP_RIGHT)), two(d, -d))
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.UP_LEFT)), two(-d, -d))
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.DOWN_RIGHT)), two(d, d))
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.DOWN_LEFT)), two(-d, d))
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.UP)), two(0.05f, -0.3f)) // slightly off-axis is still "up"
+    }
+
+    @Test
+    fun twoFingerFlicksNeedLessTravelThanPalmSwipes() {
+        assertEquals(1, swipe(0f, -0.13f, frames = 5, shape = Shape.PEACE).size)
+        assertTrue(swipe(0f, -0.13f, frames = 5, shape = Shape.PALM).isEmpty())
+    }
+
+    @Test
     fun twoFingerSwipesCanStillBeBoundToVolumeAndTracks() {
         val rec = HandGestureRecognizer()
         rec.bindings = Bindings.DEFAULT

@@ -207,17 +207,19 @@ class HandGestureRecognizer {
                     val dy = center.y - first.p.y
                     val dist = center.dist(first.p)
                     val speed = dist / (span / 1000f)
-                    if (dist >= MIN_SWIPE_DIST && speed >= MIN_SWIPE_SPEED) {
+                    val minDist = if (two) MIN_TWO_FINGER_DIST else MIN_SWIPE_DIST
+                    val minSpeed = if (two) MIN_TWO_FINGER_SPEED else MIN_SWIPE_SPEED
+                    if (dist >= minDist && speed >= minSpeed) {
                         val ax = abs(dx)
                         val ay = abs(dy)
-                        val event: GestureEvent? = when {
+                        val event: GestureEvent? = if (two) twoFingerDirection(dx, dy) else when {
                             ax >= AXIS_RATIO * ay -> when {
-                                dx > 0 -> if (two) GestureEvent.TWO_FINGER_SWIPE_RIGHT else GestureEvent.PALM_SWIPE_RIGHT
-                                else -> if (two) GestureEvent.TWO_FINGER_SWIPE_LEFT else GestureEvent.PALM_SWIPE_LEFT
+                                dx > 0 -> GestureEvent.PALM_SWIPE_RIGHT
+                                else -> GestureEvent.PALM_SWIPE_LEFT
                             }
                             ay >= AXIS_RATIO * ax -> when {
-                                dy < 0 -> if (two) GestureEvent.TWO_FINGER_SWIPE_UP else GestureEvent.PALM_SWIPE_UP
-                                else -> if (two) GestureEvent.TWO_FINGER_SWIPE_DOWN else GestureEvent.PALM_SWIPE_DOWN
+                                dy < 0 -> GestureEvent.PALM_SWIPE_UP
+                                else -> GestureEvent.PALM_SWIPE_DOWN
                             }
                             else -> null // diagonal: ambiguous, ignore
                         }
@@ -244,6 +246,21 @@ class HandGestureRecognizer {
 
         debug = "pose=$pose ratio=${"%.2f".format(pinchRatio)} grow=${"%.2f".format(growth)} fingers=${if (index) "I" else "-"}${if (middle) "M" else "-"}${if (ring) "R" else "-"}${if (pinky) "P" else "-"}"
         return Output(cursor, commands)
+    }
+
+    /** Eight 45-degree sectors, so a flick in any direction maps to something (image space: y grows downwards). */
+    private fun twoFingerDirection(dx: Float, dy: Float): GestureEvent {
+        val deg = Math.toDegrees(atan2(-dy, dx).toDouble()) // 0 = right, 90 = up
+        return when {
+            deg >= -22.5 && deg < 22.5 -> GestureEvent.TWO_FINGER_SWIPE_RIGHT
+            deg >= 22.5 && deg < 67.5 -> GestureEvent.TWO_FINGER_SWIPE_UP_RIGHT
+            deg >= 67.5 && deg < 112.5 -> GestureEvent.TWO_FINGER_SWIPE_UP
+            deg >= 112.5 && deg < 157.5 -> GestureEvent.TWO_FINGER_SWIPE_UP_LEFT
+            deg >= 157.5 || deg < -157.5 -> GestureEvent.TWO_FINGER_SWIPE_LEFT
+            deg >= -157.5 && deg < -112.5 -> GestureEvent.TWO_FINGER_SWIPE_DOWN_LEFT
+            deg >= -112.5 && deg < -67.5 -> GestureEvent.TWO_FINGER_SWIPE_DOWN
+            else -> GestureEvent.TWO_FINGER_SWIPE_DOWN_RIGHT
+        }
     }
 
     /** Latest recorded cursor sample at or before [time], else the oldest sample. */
@@ -302,6 +319,8 @@ class HandGestureRecognizer {
         const val MIN_SWIPE_SPEED = 0.7f
         const val AXIS_RATIO = 1.6f
         const val SWIPE_COOLDOWN_MS = 900L
+        const val MIN_TWO_FINGER_DIST = 0.10f
+        const val MIN_TWO_FINGER_SPEED = 0.5f
         const val STILL_SPAN_MS = 300L
         const val STILL_RADIUS = 0.05f
         const val HOLD_MS = 1000L

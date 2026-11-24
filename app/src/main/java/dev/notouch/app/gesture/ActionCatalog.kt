@@ -14,6 +14,10 @@ object ActionCatalog {
         "Scroll up (swipe down)" to Command.Swipe(SwipeDir.DOWN),
         "Swipe left" to Command.Swipe(SwipeDir.LEFT),
         "Swipe right" to Command.Swipe(SwipeDir.RIGHT),
+        "Swipe up-left" to Command.Swipe(SwipeDir.UP_LEFT),
+        "Swipe up-right" to Command.Swipe(SwipeDir.UP_RIGHT),
+        "Swipe down-left" to Command.Swipe(SwipeDir.DOWN_LEFT),
+        "Swipe down-right" to Command.Swipe(SwipeDir.DOWN_RIGHT),
         "Play / pause" to Command.Media(MediaKind.PLAY_PAUSE),
         "Next track" to Command.Media(MediaKind.NEXT),
         "Previous track" to Command.Media(MediaKind.PREVIOUS),
@@ -43,6 +47,10 @@ object ActionCatalog {
         GestureEvent.TWO_FINGER_SWIPE_DOWN to "Two fingers, swipe down",
         GestureEvent.TWO_FINGER_SWIPE_LEFT to "Two fingers, swipe left",
         GestureEvent.TWO_FINGER_SWIPE_RIGHT to "Two fingers, swipe right",
+        GestureEvent.TWO_FINGER_SWIPE_UP_LEFT to "Two fingers, swipe up-left",
+        GestureEvent.TWO_FINGER_SWIPE_UP_RIGHT to "Two fingers, swipe up-right",
+        GestureEvent.TWO_FINGER_SWIPE_DOWN_LEFT to "Two fingers, swipe down-left",
+        GestureEvent.TWO_FINGER_SWIPE_DOWN_RIGHT to "Two fingers, swipe down-right",
     )
 
     val faceGestures: List<Pair<GestureEvent, String>> = listOf(

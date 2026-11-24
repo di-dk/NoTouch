@@ -270,7 +270,7 @@ class MainActivity : Activity() {
                 "- Open palm, swipe right: Back\n" +
                 "- Open palm held still 1 s: Home\n" +
                 "- Fist held 1 s: Recents\n" +
-                "- Two fingers (index + middle), swipe any direction: swipe on screen",
+                "- Two fingers (index + middle), flick in any of 8 directions: swipe that way on screen",
         ))
         col.addView(text("Face gestures", 18f, bold = true))
         col.addView(text(

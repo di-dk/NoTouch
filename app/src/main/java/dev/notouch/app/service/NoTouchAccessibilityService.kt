@@ -185,6 +185,12 @@ class NoTouchAccessibilityService : AccessibilityService() {
             SwipeDir.DOWN -> { path.moveTo(w * 0.5f, h * 0.28f); path.lineTo(w * 0.5f, h * 0.72f) }
             SwipeDir.LEFT -> { path.moveTo(w * 0.8f, h * 0.5f); path.lineTo(w * 0.2f, h * 0.5f) }
             SwipeDir.RIGHT -> { path.moveTo(w * 0.2f, h * 0.5f); path.lineTo(w * 0.8f, h * 0.5f) }
+            else -> { // diagonals: through the centre, along the direction's signs
+                val sx = if (dir == SwipeDir.UP_RIGHT || dir == SwipeDir.DOWN_RIGHT) 1f else -1f
+                val sy = if (dir == SwipeDir.DOWN_LEFT || dir == SwipeDir.DOWN_RIGHT) 1f else -1f
+                path.moveTo(w * 0.5f - sx * w * 0.3f, h * 0.5f - sy * h * 0.22f)
+                path.lineTo(w * 0.5f + sx * w * 0.3f, h * 0.5f + sy * h * 0.22f)
+            }
         }
         dispatch(path, durationMs = 280)
     }
