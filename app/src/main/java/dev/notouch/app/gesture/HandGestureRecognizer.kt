@@ -45,6 +45,7 @@ class HandGestureRecognizer {
     private val scaleHistory = ArrayDeque<Pair<Long, Float>>()
     private val pinchHistory = ArrayDeque<Pair<Long, Float>>()
     private var lastPushAt = Long.MIN_VALUE / 2
+    private var growth = 1f
     private val angleHistory = ArrayDeque<Triple<Long, Float, Float>>() // time, angle (rad), pinch ratio
     private var lastZoomAt = Long.MIN_VALUE / 2
     private var lastRotateAt = Long.MIN_VALUE / 2
@@ -104,7 +105,6 @@ class HandGestureRecognizer {
             else -> HandPose.OTHER
         }
 
-        debug = "pose=$pose ratio=${"%.2f".format(pinchRatio)} fingers=${if (index) "I" else "-"}${if (middle) "M" else "-"}${if (ring) "R" else "-"}${if (pinky) "P" else "-"}"
 
         val commands = ArrayList<Command>(2)
 
@@ -128,6 +128,7 @@ class HandGestureRecognizer {
             scaleHistory.addLast(t to scale)
             while (scaleHistory.isNotEmpty() && t - scaleHistory.first().first > PUSH_WINDOW_MS) scaleHistory.removeFirst()
             val smallest = scaleHistory.minOf { it.second }
+            growth = scale / smallest
             val before = positionAt(t - PUSH_WINDOW_MS)
             val travel = if (before != null && cursor != null) before.dist(cursor) else 0f
             if (scale >= PUSH_RATIO * smallest && travel <= PUSH_MAX_TRAVEL && t - lastPushAt > PUSH_COOLDOWN_MS) {
@@ -137,6 +138,7 @@ class HandGestureRecognizer {
             }
         } else {
             scaleHistory.clear()
+            growth = 1f
         }
 
         // --- zoom: thumb and index touch then open (zoom in) or open then touch (zoom out) ---------------
@@ -240,6 +242,7 @@ class HandGestureRecognizer {
             bindings.resolve(GestureEvent.FIST_HOLD)?.let { commands += it }
         }
 
+        debug = "pose=$pose ratio=${"%.2f".format(pinchRatio)} grow=${"%.2f".format(growth)} fingers=${if (index) "I" else "-"}${if (middle) "M" else "-"}${if (ring) "R" else "-"}${if (pinky) "P" else "-"}"
         return Output(cursor, commands)
     }
 
