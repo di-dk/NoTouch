@@ -81,7 +81,7 @@ class NoTouchAccessibilityService : AccessibilityService() {
             AutoStartAction.START -> {
                 autoStarted = true
                 runCatching { CameraGestureService.start(this) }
-                    .onFailure { autoStarted = false; Log.w("NoTouch", "auto-start blocked", it) }
+                    .onFailure { autoStarted = false; Log.w(TAG, "auto-start blocked", it) }
             }
             AutoStartAction.STOP -> { autoStarted = false; CameraGestureService.stop(this) }
             AutoStartAction.NONE -> Unit
@@ -136,6 +136,7 @@ class NoTouchAccessibilityService : AccessibilityService() {
     }
 
     private fun execute(c: Command) {
+        Log.i(TAG, "execute $c")
         when (c) {
             is Command.Tap -> c.at?.let { tap(it) }
             is Command.Global -> performGlobalAction(
@@ -201,7 +202,7 @@ class NoTouchAccessibilityService : AccessibilityService() {
             .addStroke(GestureDescription.StrokeDescription(finger(-1f), 0, 350))
             .addStroke(GestureDescription.StrokeDescription(finger(1f), 0, 350))
             .build()
-        dispatchGesture(gesture, null, null)
+        send(gesture)
     }
 
     /** Two fingers on opposite sides of a point, both turning the same way through about 70 degrees. */
@@ -223,14 +224,26 @@ class NoTouchAccessibilityService : AccessibilityService() {
             .addStroke(GestureDescription.StrokeDescription(finger(0.0), 0, 400))
             .addStroke(GestureDescription.StrokeDescription(finger(Math.PI), 0, 400))
             .build()
-        dispatchGesture(gesture, null, null)
+        send(gesture)
+    }
+
+    private fun send(gesture: GestureDescription) {
+        val accepted = dispatchGesture(
+            gesture,
+            object : GestureResultCallback() {
+                override fun onCompleted(g: GestureDescription?) { Log.i(TAG, "gesture completed") }
+                override fun onCancelled(g: GestureDescription?) { Log.w(TAG, "gesture cancelled by the system") }
+            },
+            null,
+        )
+        if (!accepted) Log.w(TAG, "dispatchGesture refused the gesture")
     }
 
     private fun dispatch(path: Path, durationMs: Long) {
         val gesture = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, durationMs))
             .build()
-        dispatchGesture(gesture, null, null)
+        send(gesture)
     }
 
     @Suppress("DEPRECATION")
@@ -267,6 +280,7 @@ class NoTouchAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        private const val TAG = "NoTouch"
         private const val RING_DP = 44
 
         /** Non-null while the user has enabled the accessibility service. */

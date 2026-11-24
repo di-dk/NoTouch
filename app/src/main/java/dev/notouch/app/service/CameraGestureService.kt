@@ -45,6 +45,8 @@ class CameraGestureService : LifecycleService() {
 
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private val engine = GestureEngine(Mode.BOTH)
+    private var lastFeatureLogAt = 0L
+    private var lastLoggedPose = dev.notouch.app.gesture.HandPose.OTHER
     private var provider: ProcessCameraProvider? = null
     private var analysis: ImageAnalysis? = null
 
@@ -243,7 +245,16 @@ class CameraGestureService : LifecycleService() {
 
             val out = engine.process(t, handPts, faceFrame)
             NoTouchAccessibilityService.instance?.apply(out.cursor, out.commands)
+            if (handPts != null && t - lastFeatureLogAt >= 200) {
+                lastFeatureLogAt = t
+                Log.d(TAG, "features ${engine.handDebug}")
+            }
+            if (engine.handPose != lastLoggedPose) {
+                lastLoggedPose = engine.handPose
+                Log.i(TAG, "hand pose ${if (handPts != null) lastLoggedPose.name else "none"}")
+            }
             if (out.commands.isNotEmpty()) {
+                Log.i(TAG, "recognised ${out.commands}")
                 DebugBus.lastCommand = out.commands.joinToString { it.toString() }
                 DebugBus.lastCommandAt = t
             }

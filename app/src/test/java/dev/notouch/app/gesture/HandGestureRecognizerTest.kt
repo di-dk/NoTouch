@@ -191,6 +191,42 @@ class HandGestureRecognizerTest {
         assertTrue(swipe(0f, 0.3f, rec = HandGestureRecognizer().also { it.bindings = rec.bindings }).isEmpty())
     }
 
+    private fun swipeFrames(shape: Shape, n: Int = 9, dy: Float = -0.3f) = (0 until n).map {
+        TestHands.moved(TestHands.hand(shape), 0f, dy * it / (n - 1f))
+    }
+
+    @Test
+    fun aSwipeSurvivesOnePoseFlickerFrame() {
+        val frames = swipeFrames(Shape.PALM).toMutableList()
+        frames[4] = TestHands.moved(TestHands.hand(Shape.FIST), 0f, -0.15f) // detector briefly sees a fist
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.UP)), run(HandGestureRecognizer(), frames).first)
+    }
+
+    @Test
+    fun aSwipeSurvivesOneLostFrame() {
+        val frames = swipeFrames(Shape.PALM).toMutableList<List<Pt>?>()
+        frames[4] = null
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.UP)), run(HandGestureRecognizer(), frames).first)
+    }
+
+    @Test
+    fun aLongDropoutStillCancelsTheSwipe() {
+        val frames = swipeFrames(Shape.PALM, n = 5, dy = -0.1f) + List(10) { null } + swipeFrames(Shape.PALM, n = 5, dy = -0.1f)
+        assertTrue(run(HandGestureRecognizer(), frames).first.none { it is Command.Swipe })
+    }
+
+    @Test
+    fun twoFingersFlickeringToPalmStillCountAsTwoFingers() {
+        val frames = swipeFrames(Shape.PEACE).toMutableList()
+        frames[3] = TestHands.moved(TestHands.hand(Shape.PALM), 0f, -0.11f)
+        frames[6] = TestHands.moved(TestHands.hand(Shape.PALM), 0f, -0.2f)
+        val rec = HandGestureRecognizer()
+        rec.bindings = Bindings.DEFAULT
+            .with(GestureEvent.TWO_FINGER_SWIPE_UP, Command.Volume(up = true))
+            .with(GestureEvent.PALM_SWIPE_UP, Command.Swipe(SwipeDir.DOWN))
+        assertEquals(listOf<Command>(Command.Volume(up = true)), run(rec, frames).first)
+    }
+
     @Test
     fun swipeDirections() {
         assertEquals(listOf<Command>(Command.Swipe(SwipeDir.UP)), swipe(0f, -0.3f))

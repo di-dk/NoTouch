@@ -18,6 +18,8 @@ class GestureEngine(var mode: Mode = Mode.BOTH) {
 
     val handPose: HandPose get() = hand.pose
 
+    val handDebug: String get() = hand.debug
+
     var bindings: Bindings = Bindings.DEFAULT
         set(v) {
             field = v

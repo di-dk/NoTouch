@@ -32,9 +32,15 @@ class HandGestureRecognizer {
     private var smoothed: Pt? = null
     private val smoother = AdaptiveSmoother()
     private val cursorHistory = ArrayDeque<Pair<Long, Pt>>()
-    private val palmTrail = ArrayDeque<Pair<Long, Pt>>()
+    private class Sample(val t: Long, val p: Pt, val two: Boolean)
+    private val palmTrail = ArrayDeque<Sample>()
     private var lastSwipeAt = Long.MIN_VALUE / 2
-    private var trailPose = HandPose.OTHER
+    private var lastSwipePoseAt = Long.MIN_VALUE / 2
+    private var lastSeenAt = Long.MIN_VALUE / 2
+
+    /** For the on-phone diagnostics log only. */
+    var debug = ""
+        private set
 
     private val scaleHistory = ArrayDeque<Pair<Long, Float>>()
     private val pinchHistory = ArrayDeque<Pair<Long, Float>>()
@@ -47,7 +53,7 @@ class HandGestureRecognizer {
 
     fun reset() {
         pose = HandPose.OTHER
-        trailPose = HandPose.OTHER
+        lastSwipePoseAt = Long.MIN_VALUE / 2
         pinching = false
         smoothed = null
         smoother.reset()
@@ -61,9 +67,18 @@ class HandGestureRecognizer {
 
     fun process(t: Long, lm: List<Pt>?): Output {
         if (lm == null || lm.size < 21) {
-            reset()
+            if (t - lastSeenAt > DROPOUT_GRACE_MS) {
+                reset()
+            } else {
+                // a brief detection dropout must not wipe a swipe or zoom in progress, but never bridges a hold
+                pose = HandPose.OTHER
+                pinching = false
+                homeTrigger.reset()
+                recentsTrigger.reset()
+            }
             return Output.NONE
         }
+        lastSeenAt = t
         val wrist = lm[WRIST]
         val scale = wrist.dist(lm[MIDDLE_MCP]).coerceAtLeast(1e-3f)
 
@@ -88,6 +103,8 @@ class HandGestureRecognizer {
             !index && !middle && !ring && !pinky -> HandPose.FIST
             else -> HandPose.OTHER
         }
+
+        debug = "pose=$pose ratio=${"%.2f".format(pinchRatio)} fingers=${if (index) "I" else "-"}${if (middle) "M" else "-"}${if (ring) "R" else "-"}${if (pinky) "P" else "-"}"
 
         val commands = ArrayList<Command>(2)
 
@@ -166,23 +183,27 @@ class HandGestureRecognizer {
             angleHistory.clear()
         }
 
-        // --- palm: swipe + hold -----------------------------------------------------------
+        // --- palm / two fingers: swipe, and palm held still -------------------------------------
         var still = false
-        if (pose != trailPose) palmTrail.clear()
-        trailPose = pose
-        if (pose == HandPose.PALM || pose == HandPose.PEACE) {
-            val two = pose == HandPose.PEACE
+        val swipePose = pose == HandPose.PALM || pose == HandPose.PEACE
+        if (swipePose) {
+            lastSwipePoseAt = t
+        } else if (t - lastSwipePoseAt > POSE_FLICKER_GRACE_MS) {
+            palmTrail.clear()
+        }
+        if (swipePose) {
             val center = lm[MIDDLE_MCP]
-            palmTrail.addLast(t to center)
-            while (palmTrail.isNotEmpty() && t - palmTrail.first().first > TRAIL_MS) palmTrail.removeFirst()
+            palmTrail.addLast(Sample(t, center, pose == HandPose.PEACE))
+            while (palmTrail.isNotEmpty() && t - palmTrail.first().t > TRAIL_MS) palmTrail.removeFirst()
 
             if (palmTrail.size >= 3 && t - lastSwipeAt > SWIPE_COOLDOWN_MS) {
-                val (t0, p0) = palmTrail.first()
-                val span = t - t0
+                val first = palmTrail.first()
+                val span = t - first.t
                 if (span >= MIN_SWIPE_SPAN_MS) {
-                    val dx = center.x - p0.x
-                    val dy = center.y - p0.y
-                    val dist = center.dist(p0)
+                    val two = palmTrail.count { it.two } * 2 > palmTrail.size // finger counts flicker mid-swipe: go by majority
+                    val dx = center.x - first.p.x
+                    val dy = center.y - first.p.y
+                    val dist = center.dist(first.p)
                     val speed = dist / (span / 1000f)
                     if (dist >= MIN_SWIPE_DIST && speed >= MIN_SWIPE_SPEED) {
                         val ax = abs(dx)
@@ -207,11 +228,9 @@ class HandGestureRecognizer {
                     }
                 }
             }
-            if (palmTrail.size >= 3 && t - palmTrail.first().first >= STILL_SPAN_MS) {
-                still = palmTrail.all { it.second.dist(center) < STILL_RADIUS }
+            if (pose == HandPose.PALM && palmTrail.size >= 3 && t - palmTrail.first().t >= STILL_SPAN_MS) {
+                still = palmTrail.all { it.p.dist(center) < STILL_RADIUS }
             }
-        } else {
-            palmTrail.clear()
         }
 
         if (homeTrigger.update(if (still) 1f else 0f, t)) {
@@ -265,6 +284,8 @@ class HandGestureRecognizer {
         const val PUSH_MAX_TRAVEL = 0.15f
         const val PUSH_COOLDOWN_MS = 700L
         const val ZOOM_WINDOW_MS = 900L
+        const val DROPOUT_GRACE_MS = 200L
+        const val POSE_FLICKER_GRACE_MS = 250L
         const val ZOOM_OPEN = 0.9f
         const val ZOOM_COOLDOWN_MS = 800L
         const val ROTATE_WINDOW_MS = 700L
