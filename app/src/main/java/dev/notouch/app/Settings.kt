@@ -43,4 +43,27 @@ object Settings {
     }
 
     fun setBindings(c: Context, b: Bindings) = prefs(c).edit().putString("bindings", b.serialize()).apply()
+
+    fun autoStartApps(c: Context): Set<String> = prefs(c).getStringSet("autoStartApps", emptySet()) ?: emptySet()
+
+    fun setAutoStart(c: Context, pkg: String, on: Boolean) {
+        val apps = autoStartApps(c).toMutableSet().apply { if (on) add(pkg) else remove(pkg) }
+        prefs(c).edit().putStringSet("autoStartApps", apps).apply()
+    }
+
+    fun hasProfile(c: Context, pkg: String): Boolean = prefs(c).contains("bindings:$pkg")
+
+    /** The app's own gesture table if it has one, otherwise the global table. */
+    fun bindingsFor(c: Context, pkg: String?): Bindings {
+        val text = pkg?.let { prefs(c).getString("bindings:$it", null) } ?: return bindings(c)
+        return profileCache.getOrPut(text) { Bindings.parse(text) }
+    }
+
+    fun setProfile(c: Context, pkg: String, b: Bindings?) {
+        val e = prefs(c).edit()
+        if (b == null) e.remove("bindings:$pkg") else e.putString("bindings:$pkg", b.serialize())
+        e.apply()
+    }
+
+    private val profileCache = HashMap<String, Bindings>()
 }

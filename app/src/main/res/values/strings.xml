@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">NoTouch</string>
-    <string name="a11y_description">Lets NoTouch perform taps, swipes and Back/Home/Recents for you when it recognises a hand or face gesture from the front camera. It does not read screen content.</string>
+    <string name="a11y_description">Lets NoTouch perform taps, swipes and Back/Home/Recents for you when it recognises a hand or face gesture from the front camera. It only notes which app is in front (for per-app gestures and auto-start) and does not read screen content.</string>
     <string name="notif_channel">NoTouch is active</string>
     <string name="notif_title">NoTouch camera gestures</string>
     <string name="notif_running">Watching for gestures</string>

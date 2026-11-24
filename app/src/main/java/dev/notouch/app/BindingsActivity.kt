@@ -20,9 +20,17 @@ class BindingsActivity : Activity() {
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
+    /** Set when editing one app's profile; null edits the global table. */
+    private val pkg: String? by lazy { intent.getStringExtra(EXTRA_PACKAGE) }
+
+    private fun current(): Bindings = Settings.bindingsFor(this, pkg)
+
+    private fun save(b: Bindings) = pkg?.let { Settings.setProfile(this, it, b) } ?: Settings.setBindings(this, b)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = "Gesture actions"
+        title = pkg?.let { p -> "Gestures for " + runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(p, 0)) }.getOrDefault(p) }
+            ?: "Gesture actions"
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(24))
@@ -40,14 +48,12 @@ class BindingsActivity : Activity() {
                     this@BindingsActivity, android.R.layout.simple_spinner_dropdown_item,
                     ActionCatalog.actions.map { it.first },
                 )
-                setSelection(ActionCatalog.indexOf(Settings.bindings(this@BindingsActivity).commandFor(event)), false)
+                setSelection(ActionCatalog.indexOf(current().commandFor(event)), false)
                 onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                     override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
                         val cmd = ActionCatalog.actions[pos].second
-                        val current = Settings.bindings(this@BindingsActivity)
-                        if (current.commandFor(event) != cmd) {
-                            Settings.setBindings(this@BindingsActivity, current.with(event, cmd))
-                        }
+                        val now = current()
+                        if (now.commandFor(event) != cmd) save(now.with(event, cmd))
                     }
                     override fun onNothingSelected(p: AdapterView<*>?) {}
                 }
@@ -55,7 +61,8 @@ class BindingsActivity : Activity() {
         }
 
         col.addView(TextView(this).apply {
-            text = "Choose what each gesture does. Changes apply immediately."
+            text = if (pkg == null) "Choose what each gesture does. Changes apply immediately."
+            else "These actions apply only while this app is in front. Changing any gesture creates a profile for the app."
             textSize = 13f
         })
         heading("Hand gestures")
@@ -63,12 +70,17 @@ class BindingsActivity : Activity() {
         heading("Face gestures")
         ActionCatalog.faceGestures.forEach { (e, l) -> row(e, l) }
         col.addView(Button(this).apply {
-            text = "Reset all to defaults"
+            text = if (pkg == null) "Reset all to defaults" else "Use the global gesture actions for this app"
             setOnClickListener {
-                Settings.setBindings(this@BindingsActivity, Bindings.DEFAULT)
+                if (pkg == null) Settings.setBindings(this@BindingsActivity, Bindings.DEFAULT)
+                else Settings.setProfile(this@BindingsActivity, pkg!!, null)
                 recreate()
             }
         })
         setContentView(ScrollView(this).apply { addView(col) })
+    }
+
+    companion object {
+        const val EXTRA_PACKAGE = "package"
     }
 }

@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -69,7 +70,23 @@ class NoTouchAccessibilityService : AccessibilityService() {
         runCatching { windowManager?.addView(cursorView, cursorParams) }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = event.packageName?.toString() ?: return
+        // Keyboards, system UI and other non-launchable packages are not "the app you are using".
+        if (packageManager.getLaunchIntentForPackage(pkg) == null) return
+        foregroundPackage = pkg
+        if (!CameraGestureService.running) autoStarted = false
+        when (AutoStart.decide(pkg, packageName, Settings.autoStartApps(this), CameraGestureService.running, autoStarted)) {
+            AutoStartAction.START -> {
+                autoStarted = true
+                runCatching { CameraGestureService.start(this) }
+                    .onFailure { autoStarted = false; Log.w("NoTouch", "auto-start blocked", it) }
+            }
+            AutoStartAction.STOP -> { autoStarted = false; CameraGestureService.stop(this) }
+            AutoStartAction.NONE -> Unit
+        }
+    }
 
     override fun onInterrupt() = Unit
 
@@ -215,6 +232,11 @@ class NoTouchAccessibilityService : AccessibilityService() {
         /** Non-null while the user has enabled the accessibility service. */
         @Volatile
         var instance: NoTouchAccessibilityService? = null
+
+        /** Package of the app in front, from window-change events (null until the first one). */
+        @Volatile var foregroundPackage: String? = null
+
+        @Volatile private var autoStarted = false
             private set
     }
 }

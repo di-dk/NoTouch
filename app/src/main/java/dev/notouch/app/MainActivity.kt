@@ -218,6 +218,10 @@ class MainActivity : Activity() {
         col.addView(liveView)
 
         col.addView(Button(this).apply {
+            text = "Apps: auto-start and per-app gestures"
+            setOnClickListener { startActivity(Intent(this@MainActivity, AppsActivity::class.java)) }
+        })
+        col.addView(Button(this).apply {
             text = "Customize gesture actions"
             setOnClickListener { startActivity(Intent(this@MainActivity, BindingsActivity::class.java)) }
         })
