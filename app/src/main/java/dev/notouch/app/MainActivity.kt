@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -45,9 +46,11 @@ class MainActivity : Activity() {
     private lateinit var liveView: LiveView
     private lateinit var liveCheck: CheckBox
     private val ui = Handler(Looper.getMainLooper())
+    private var ticks = 0
     private val tick = object : Runnable {
         override fun run() {
             if (liveView.visibility == View.VISIBLE) liveView.invalidate()
+            if (++ticks % 12 == 0) refresh() // about once a second: picks up the services starting or dying
             ui.postDelayed(this, 80)
         }
     }
@@ -85,18 +88,47 @@ class MainActivity : Activity() {
         return enabled?.split(':')?.any { it.equals(me, ignoreCase = true) } == true
     }
 
+    private fun tint(button: Button, color: Int) {
+        button.backgroundTintList = ColorStateList.valueOf(color)
+        button.setTextColor(Color.WHITE)
+    }
+
     private fun refresh() {
         val cam = hasCamera()
         cameraStatus.text = if (cam) "Camera permission: granted" else "Camera permission: needed"
+        cameraStatus.setTextColor(if (cam) GREEN else RED)
         cameraButton.visibility = if (cam) View.GONE else View.VISIBLE
+        tint(cameraButton, AMBER)
 
-        val a11y = a11yEnabled()
-        a11yStatus.text = if (a11y) "Accessibility service: on" else "Accessibility service: off (needed to tap and swipe for you)"
-        a11yButton.text = if (a11y) "Accessibility settings" else "Turn on in accessibility settings"
+        val a11y = SetupState.a11y(a11yEnabled(), NoTouchAccessibilityService.instance != null)
+        when (a11y) {
+            A11yState.ON -> {
+                a11yStatus.text = "Accessibility service: on and connected"
+                a11yButton.text = "Accessibility settings"
+                tint(a11yButton, GREEN)
+            }
+            A11yState.STALLED -> {
+                a11yStatus.text = "Accessibility service: switched on but not running (Android stopped it). " +
+                    "Turn it off and on again. If this keeps happening, set NoTouch to \"No restrictions\" under battery settings."
+                a11yButton.text = "Turn off and on again"
+                tint(a11yButton, AMBER)
+            }
+            A11yState.OFF -> {
+                a11yStatus.text = "Accessibility service: off (needed to tap and swipe for you)"
+                a11yButton.text = "Turn on in accessibility settings"
+                tint(a11yButton, RED)
+            }
+        }
+        a11yStatus.setTextColor(when (a11y) { A11yState.ON -> GREEN; A11yState.STALLED -> AMBER; A11yState.OFF -> RED })
 
-        val running = CameraGestureService.running
-        toggleButton.text = if (running) "Stop gestures" else "Start gestures"
-        toggleButton.isEnabled = cam && a11y
+        val run = SetupState.run(cam, a11y, CameraGestureService.running)
+        toggleButton.text = when (run) {
+            RunState.RUNNING -> "Stop gestures"
+            RunState.READY -> "Start gestures"
+            RunState.BLOCKED -> "Start gestures (finish the steps above first)"
+        }
+        toggleButton.isEnabled = run != RunState.BLOCKED
+        tint(toggleButton, when (run) { RunState.RUNNING -> RED; RunState.READY -> GREEN; RunState.BLOCKED -> GREY })
     }
 
     // ---- ui ---------------------------------------------------------------------------
@@ -256,6 +288,13 @@ class MainActivity : Activity() {
             isFillViewport = true
             addView(col)
         }
+    }
+
+    private companion object {
+        const val GREEN = 0xFF2E7D32.toInt()
+        const val RED = 0xFFC62828.toInt()
+        const val AMBER = 0xFFEF6C00.toInt()
+        const val GREY = 0xFF9E9E9E.toInt()
     }
 }
 
