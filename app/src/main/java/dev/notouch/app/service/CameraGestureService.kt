@@ -218,6 +218,7 @@ class CameraGestureService : LifecycleService() {
 
             val sens = Settings.sensitivity(this)
             engine.faceGainScale = sens
+            engine.bindings = Settings.bindings(this)
             var t = SystemClock.uptimeMillis()
             if (t <= lastTimestamp) t = lastTimestamp + 1 // MediaPipe needs strictly increasing timestamps
             if (lastTimestamp != 0L) {

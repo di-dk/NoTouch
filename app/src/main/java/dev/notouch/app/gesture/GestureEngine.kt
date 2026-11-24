@@ -18,6 +18,13 @@ class GestureEngine(var mode: Mode = Mode.BOTH) {
 
     val handPose: HandPose get() = hand.pose
 
+    var bindings: Bindings = Bindings.DEFAULT
+        set(v) {
+            field = v
+            hand.bindings = v
+            face.bindings = v
+        }
+
     fun recenterFace() = face.recenter()
 
     fun reset() {

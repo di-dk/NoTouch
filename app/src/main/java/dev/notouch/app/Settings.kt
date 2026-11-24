@@ -1,6 +1,7 @@
 package dev.notouch.app
 
 import android.content.Context
+import dev.notouch.app.gesture.Bindings
 import dev.notouch.app.gesture.Mode
 
 /** Tiny SharedPreferences wrapper for the two user settings. */
@@ -26,4 +27,20 @@ object Settings {
     fun showCursor(c: Context): Boolean = prefs(c).getBoolean("showCursor", true)
 
     fun setShowCursor(c: Context, v: Boolean) = prefs(c).edit().putBoolean("showCursor", v).apply()
+
+    private var cachedText: String? = null
+    private var cachedBindings = Bindings.DEFAULT
+
+    /** Gesture-to-action table; falls back to the defaults until the user changes something. Cached per stored string. */
+    @Synchronized
+    fun bindings(c: Context): Bindings {
+        val text = prefs(c).getString("bindings", null) ?: return Bindings.DEFAULT
+        if (text != cachedText) {
+            cachedText = text
+            cachedBindings = Bindings.parse(text)
+        }
+        return cachedBindings
+    }
+
+    fun setBindings(c: Context, b: Bindings) = prefs(c).edit().putString("bindings", b.serialize()).apply()
 }

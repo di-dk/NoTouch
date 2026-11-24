@@ -17,6 +17,8 @@ class FaceGestureRecognizer {
     private var smoothed: Pt? = null
     private val smoother = AdaptiveSmoother()
 
+    var bindings = Bindings.DEFAULT
+
     /** Head-to-cursor gain multiplier (the sensitivity setting). */
     var gainScale = 1f
 
@@ -69,11 +71,12 @@ class FaceGestureRecognizer {
         }
 
         val commands = ArrayList<Command>(2)
-        if (tap.update(jaw, t)) commands += Command.Tap(null)
-        if (back.update(brow, t)) commands += Command.Global(GlobalKind.BACK)
-        if (scrollDown.update(smile, t)) commands += Command.Swipe(SwipeDir.UP)
-        if (scrollUp.update(pucker, t)) commands += Command.Swipe(SwipeDir.DOWN)
-        if (home.update(blink, t)) commands += Command.Global(GlobalKind.HOME)
+        fun fire(event: GestureEvent) { bindings.resolve(event)?.let { commands += it } }
+        if (tap.update(jaw, t)) fire(GestureEvent.MOUTH_OPEN)
+        if (back.update(brow, t)) fire(GestureEvent.BROWS_RAISED)
+        if (scrollDown.update(smile, t)) fire(GestureEvent.SMILE_HOLD)
+        if (scrollUp.update(pucker, t)) fire(GestureEvent.PUCKER_HOLD)
+        if (home.update(blink, t)) fire(GestureEvent.BLINK_HOLD)
         return Output(cursor, commands)
     }
 

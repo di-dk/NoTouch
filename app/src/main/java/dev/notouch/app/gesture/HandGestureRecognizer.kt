@@ -2,7 +2,7 @@ package dev.notouch.app.gesture
 
 import kotlin.math.abs
 
-enum class HandPose { PALM, FIST, POINT, PINCH, OTHER }
+enum class HandPose { PALM, PEACE, FIST, POINT, PINCH, OTHER }
 
 /**
  * Turns 21 hand landmarks per frame (MediaPipe layout, upright + mirrored) into commands.
@@ -13,8 +13,13 @@ enum class HandPose { PALM, FIST, POINT, PINCH, OTHER }
  *  - Open palm, swipe right        -> Back
  *  - Open palm held still          -> Home
  *  - Fist held                     -> Recents
+ *  - Two fingers (index + middle), swipe -> volume / previous / next by default
+ *
+ * Every action goes through [bindings], so the user can remap any gesture.
  */
 class HandGestureRecognizer {
+
+    var bindings = Bindings.DEFAULT
 
     var pose: HandPose = HandPose.OTHER
         private set
@@ -25,6 +30,7 @@ class HandGestureRecognizer {
     private val cursorHistory = ArrayDeque<Pair<Long, Pt>>()
     private val palmTrail = ArrayDeque<Pair<Long, Pt>>()
     private var lastSwipeAt = Long.MIN_VALUE / 2
+    private var trailPose = HandPose.OTHER
 
     private val tapTrigger = HoldTrigger(0.5f, 0.5f, holdMs = TAP_CONFIRM_MS, cooldownMs = 600)
     private val homeTrigger = HoldTrigger(0.5f, 0.5f, holdMs = HOLD_MS, cooldownMs = 1500)
@@ -32,6 +38,7 @@ class HandGestureRecognizer {
 
     fun reset() {
         pose = HandPose.OTHER
+        trailPose = HandPose.OTHER
         pinching = false
         smoothed = null
         smoother.reset()
@@ -66,6 +73,7 @@ class HandGestureRecognizer {
             // indexReach separates a pinch from a fist whose thumb happens to touch the index.
             pinching && othersCurled && indexReach > MIN_PINCH_REACH -> HandPose.PINCH
             index && othersCurled -> HandPose.POINT
+            index && middle && !ring && !pinky -> HandPose.PEACE
             index && middle && ring && pinky -> HandPose.PALM
             !index && !middle && !ring && !pinky -> HandPose.FIST
             else -> HandPose.OTHER
@@ -89,12 +97,15 @@ class HandGestureRecognizer {
             cursorHistory.clear()
         }
         if (tapTrigger.update(if (pose == HandPose.PINCH) 1f else 0f, t)) {
-            commands += Command.Tap(positionAt(t - TAP_LOOKBACK_MS) ?: cursor)
+            bindings.resolve(GestureEvent.PINCH, positionAt(t - TAP_LOOKBACK_MS) ?: cursor)?.let { commands += it }
         }
 
         // --- palm: swipe + hold -----------------------------------------------------------
         var still = false
-        if (pose == HandPose.PALM) {
+        if (pose != trailPose) palmTrail.clear()
+        trailPose = pose
+        if (pose == HandPose.PALM || pose == HandPose.PEACE) {
+            val two = pose == HandPose.PEACE
             val center = lm[MIDDLE_MCP]
             palmTrail.addLast(t to center)
             while (palmTrail.isNotEmpty() && t - palmTrail.first().first > TRAIL_MS) palmTrail.removeFirst()
@@ -110,15 +121,19 @@ class HandGestureRecognizer {
                     if (dist >= MIN_SWIPE_DIST && speed >= MIN_SWIPE_SPEED) {
                         val ax = abs(dx)
                         val ay = abs(dy)
-                        val cmd: Command? = when {
-                            ax >= AXIS_RATIO * ay ->
-                                if (dx > 0) Command.Global(GlobalKind.BACK) else Command.Swipe(SwipeDir.LEFT)
-                            ay >= AXIS_RATIO * ax ->
-                                if (dy < 0) Command.Swipe(SwipeDir.UP) else Command.Swipe(SwipeDir.DOWN)
+                        val event: GestureEvent? = when {
+                            ax >= AXIS_RATIO * ay -> when {
+                                dx > 0 -> if (two) GestureEvent.TWO_FINGER_SWIPE_RIGHT else GestureEvent.PALM_SWIPE_RIGHT
+                                else -> if (two) GestureEvent.TWO_FINGER_SWIPE_LEFT else GestureEvent.PALM_SWIPE_LEFT
+                            }
+                            ay >= AXIS_RATIO * ax -> when {
+                                dy < 0 -> if (two) GestureEvent.TWO_FINGER_SWIPE_UP else GestureEvent.PALM_SWIPE_UP
+                                else -> if (two) GestureEvent.TWO_FINGER_SWIPE_DOWN else GestureEvent.PALM_SWIPE_DOWN
+                            }
                             else -> null // diagonal: ambiguous, ignore
                         }
-                        if (cmd != null) {
-                            commands += cmd
+                        if (event != null) {
+                            bindings.resolve(event)?.let { commands += it }
                             lastSwipeAt = t
                             palmTrail.clear()
                             homeTrigger.reset()
@@ -134,10 +149,10 @@ class HandGestureRecognizer {
         }
 
         if (homeTrigger.update(if (still) 1f else 0f, t)) {
-            commands += Command.Global(GlobalKind.HOME)
+            bindings.resolve(GestureEvent.PALM_HOLD)?.let { commands += it }
         }
         if (recentsTrigger.update(if (pose == HandPose.FIST) 1f else 0f, t)) {
-            commands += Command.Global(GlobalKind.RECENTS)
+            bindings.resolve(GestureEvent.FIST_HOLD)?.let { commands += it }
         }
 
         return Output(cursor, commands)

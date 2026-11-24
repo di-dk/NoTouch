@@ -36,7 +36,7 @@ class HandGestureRecognizerTest {
         assertEquals(HandPose.FIST, pose(Shape.FIST))
         assertEquals(HandPose.POINT, pose(Shape.POINT))
         assertEquals(HandPose.PINCH, pose(Shape.PINCH))
-        assertEquals(HandPose.OTHER, pose(Shape.PEACE))
+        assertEquals(HandPose.PEACE, pose(Shape.PEACE))
     }
 
     @Test
@@ -105,14 +105,35 @@ class HandGestureRecognizerTest {
         assertEquals("still pinching inside the hysteresis band", HandPose.PINCH, rec.pose)
     }
 
-    private fun swipe(dx: Float, dy: Float, frames: Int = 8): List<Command> {
-        val rec = HandGestureRecognizer()
-        val start = TestHands.hand(Shape.PALM, cx = 0.5f, cy = 0.5f)
+    private fun swipe(
+        dx: Float, dy: Float, frames: Int = 8, shape: Shape = Shape.PALM,
+        rec: HandGestureRecognizer = HandGestureRecognizer(),
+    ): List<Command> {
+        val start = TestHands.hand(shape, cx = 0.5f, cy = 0.5f)
         val hands = (0 until frames).map {
             val f = it / (frames - 1f)
             TestHands.moved(start, dx * f, dy * f)
         }
         return run(rec, hands).first
+    }
+
+    @Test
+    fun twoFingerSwipesAdjustVolumeAndSkipTracks() {
+        fun two(dx: Float, dy: Float) = swipe(dx, dy, shape = Shape.PEACE)
+        assertEquals(listOf<Command>(Command.Volume(up = true)), two(0f, -0.3f))
+        assertEquals(listOf<Command>(Command.Volume(up = false)), two(0f, 0.3f))
+        assertEquals(listOf<Command>(Command.Media(MediaKind.PREVIOUS)), two(-0.3f, 0f))
+        assertEquals(listOf<Command>(Command.Media(MediaKind.NEXT)), two(0.3f, 0f))
+    }
+
+    @Test
+    fun remappedAndUnboundGestures() {
+        val rec = HandGestureRecognizer()
+        rec.bindings = Bindings.DEFAULT
+            .with(GestureEvent.PALM_SWIPE_UP, Command.Media(MediaKind.PLAY_PAUSE))
+            .with(GestureEvent.PALM_SWIPE_DOWN, null)
+        assertEquals(listOf<Command>(Command.Media(MediaKind.PLAY_PAUSE)), swipe(0f, -0.3f, rec = rec))
+        assertTrue(swipe(0f, 0.3f, rec = HandGestureRecognizer().also { it.bindings = rec.bindings }).isEmpty())
     }
 
     @Test

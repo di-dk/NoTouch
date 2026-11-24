@@ -6,6 +6,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.media.AudioManager
+import android.view.KeyEvent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -17,6 +19,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import dev.notouch.app.Settings
 import dev.notouch.app.gesture.Command
+import dev.notouch.app.gesture.MediaKind
 import dev.notouch.app.gesture.GlobalKind
 import dev.notouch.app.gesture.Pt
 import dev.notouch.app.gesture.SwipeDir
@@ -29,6 +32,7 @@ import dev.notouch.app.gesture.SwipeDir
 class NoTouchAccessibilityService : AccessibilityService() {
 
     private val main = Handler(Looper.getMainLooper())
+    private val audio by lazy { getSystemService(AudioManager::class.java) }
     private var windowManager: WindowManager? = null
     private var cursorView: CursorView? = null
     private var cursorParams: WindowManager.LayoutParams? = null
@@ -126,7 +130,23 @@ class NoTouchAccessibilityService : AccessibilityService() {
                 },
             )
             is Command.Swipe -> swipe(c.dir)
+            is Command.Media -> media(c.kind)
+            is Command.Volume -> audio.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                if (c.up) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+                AudioManager.FLAG_SHOW_UI,
+            )
         }
+    }
+
+    private fun media(kind: MediaKind) {
+        val code = when (kind) {
+            MediaKind.PLAY_PAUSE -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            MediaKind.NEXT -> KeyEvent.KEYCODE_MEDIA_NEXT
+            MediaKind.PREVIOUS -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+        }
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
     }
 
     private fun tap(p: Pt) {
