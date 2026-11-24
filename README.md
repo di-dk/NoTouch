@@ -18,10 +18,10 @@ NoTouch is an Android accessibility service. It watches the front camera with [M
 
 ## Features
 
-- **Hand mode**: point to move a cursor, pinch to tap, swipe an open palm to scroll or go Back.
+- **Hand mode**: point to move a cursor, push the finger forward to click, pinch and spread to zoom, twist to rotate, swipe with two fingers or an open palm.
 - **Face and head mode**: move your head to move the cursor, then open your mouth, raise eyebrows, smile, pucker or blink to trigger actions.
 - **Both mode** combines the two.
-- **Media and volume**: two-finger swipes change volume and skip tracks.
+- **Media and volume**: bind any gesture to play/pause, next, previous or volume.
 - **Remappable gestures**: every gesture is bound to an action through a saved table (screen to edit it is planned; defaults below).
 - **Works in any app**: taps, swipes, Back, Home and Recents are injected through an accessibility service.
 - **On-screen pointer** so you can see where a tap will land.
@@ -36,13 +36,15 @@ NoTouch is an Android accessibility service. It watches the front camera with [M
 | Gesture | Action |
 |---|---|
 | Point with index finger | Move cursor |
-| Pinch thumb and index | Tap at the pointed position |
+| Push the pointing finger quickly toward the camera | Click where the pointer was |
+| Thumb and index touching, then spread apart | Zoom in |
+| Thumb and index apart, then touch together | Zoom out |
+| Thumb and index apart, twist clockwise or counterclockwise | Rotate |
 | Open palm, swipe up, down or left | Scroll or swipe in that direction |
 | Open palm, swipe right | Back |
 | Open palm, hold still about 1 s | Home |
 | Closed fist, hold about 1 s | Recents |
-| Two fingers (index + middle), swipe up or down | Volume up or down |
-| Two fingers, swipe left or right | Previous or next track |
+| Two fingers (index + middle), swipe in any of four directions | Swipe on screen |
 
 ### Face and head
 

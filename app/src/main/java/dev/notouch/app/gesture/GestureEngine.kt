@@ -43,11 +43,11 @@ class GestureEngine(var mode: Mode = Mode.BOTH) {
 
         val commands = ArrayList<Command>(handOut.commands.size + faceOut.commands.size)
         for (c in handOut.commands + faceOut.commands) {
-            if (c is Command.Tap) {
-                val at = c.at ?: cursor ?: continue
-                commands += Command.Tap(at)
-            } else {
-                commands += c
+            when (c) {
+                is Command.Tap -> commands += Command.Tap(c.at ?: cursor ?: continue)
+                is Command.Zoom -> commands += Command.Zoom(c.zoomIn, c.at ?: cursor ?: Pt(0.5f, 0.5f))
+                is Command.Rotate -> commands += Command.Rotate(c.clockwise, c.at ?: cursor ?: Pt(0.5f, 0.5f))
+                else -> commands += c
             }
         }
         return Output(cursor, commands)

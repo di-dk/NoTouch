@@ -69,27 +69,71 @@ class HandGestureRecognizerTest {
         assertEquals(1f, edge.x, 0f)
     }
 
+    private val still = TestHands.hand(Shape.POINT, cx = 0.4f)
+
+    private fun pushFrames(from: Float, to: Float, n: Int) =
+        List(n) { TestHands.pushed(still, from + (to - from) * (it + 1) / n) }
+
     @Test
-    fun pinchTapsAtTheCursorFromBeforeThePinch() {
+    fun pinchNoLongerClicks() {
         val rec = HandGestureRecognizer()
-        val pointAt = TestHands.hand(Shape.POINT, cx = 0.4f)
-        val (_, t) = run(rec, repeat(pointAt, 15))
-        val cursorBefore = rec.process(t, pointAt).cursor!!
-        // pinching drags the fingertip; the tap must still land where the cursor was
-        val pinch = TestHands.moved(TestHands.hand(Shape.PINCH, cx = 0.4f), 0.05f, 0.05f)
-        val (cmds, _) = run(rec, repeat(pinch, 10), t + frameMs)
-        val taps = cmds.filterIsInstance<Command.Tap>()
-        assertEquals(1, taps.size)
-        val at = taps[0].at!!
-        assertEquals(cursorBefore.x, at.x, 0.02f)
-        assertEquals(cursorBefore.y, at.y, 0.02f)
+        val (cmds, _) = run(rec, repeat(TestHands.hand(Shape.POINT), 5) + repeat(TestHands.hand(Shape.PINCH), 60))
+        assertTrue(cmds.none { it is Command.Tap })
     }
 
     @Test
-    fun holdingAPinchTapsOnlyOnce() {
+    fun pushingTheFingerForwardClicksWhereThePointerWas() {
         val rec = HandGestureRecognizer()
-        val (cmds, _) = run(rec, repeat(TestHands.hand(Shape.POINT), 5) + repeat(TestHands.hand(Shape.PINCH), 90))
+        val (_, t) = run(rec, repeat(still, 10))
+        val cursorBefore = rec.process(t, still).cursor!!
+        val (cmds, _) = run(rec, pushFrames(1f, 1.3f, 6), t + frameMs)
+        val taps = cmds.filterIsInstance<Command.Tap>()
+        assertEquals(1, taps.size)
+        assertEquals(cursorBefore.x, taps[0].at!!.x, 0.03f)
+        assertEquals(cursorBefore.y, taps[0].at!!.y, 0.03f)
+    }
+
+    @Test
+    fun aSlowApproachDoesNotClick() {
+        val rec = HandGestureRecognizer()
+        val (cmds, _) = run(rec, repeat(still, 5) + pushFrames(1f, 1.3f, 60))
+        assertTrue(cmds.none { it is Command.Tap })
+    }
+
+    @Test
+    fun oneClickPerPush() {
+        val rec = HandGestureRecognizer()
+        val (cmds, _) = run(rec, repeat(still, 10) + pushFrames(1f, 1.3f, 6) + List(30) { TestHands.pushed(still, 1.3f) })
         assertEquals(1, cmds.filterIsInstance<Command.Tap>().size)
+    }
+
+    @Test
+    fun thumbAndIndexSpreadingZoomsInAndClosingZoomsOut() {
+        val apart = TestHands.hand(Shape.POINT)
+        val touching = TestHands.hand(Shape.PINCH)
+        val zoomIn = run(HandGestureRecognizer(), repeat(touching, 8) + repeat(apart, 8)).first
+        assertEquals(listOf(true), zoomIn.filterIsInstance<Command.Zoom>().map { it.zoomIn })
+        val zoomOut = run(HandGestureRecognizer(), repeat(apart, 8) + repeat(touching, 8)).first
+        assertEquals(listOf(false), zoomOut.filterIsInstance<Command.Zoom>().map { it.zoomIn })
+    }
+
+    @Test
+    fun plainPointingNeverZooms() {
+        val (cmds, _) = run(HandGestureRecognizer(), repeat(TestHands.hand(Shape.POINT), 90))
+        assertTrue(cmds.none { it is Command.Zoom || it is Command.Rotate })
+    }
+
+    @Test
+    fun twistingThumbAndIndexRotates() {
+        fun twist(from: Float, to: Float): List<Command> {
+            val base = TestHands.hand(Shape.POINT)
+            val hands = List(15) { TestHands.thumbAt(base, 0.2f, from + (to - from) * it / 14f) }
+            return run(HandGestureRecognizer(), hands).first
+        }
+        val deg = (Math.PI / 180).toFloat()
+        assertEquals(listOf(true), twist(-60 * deg, 60 * deg).filterIsInstance<Command.Rotate>().map { it.clockwise })
+        assertEquals(listOf(false), twist(60 * deg, -60 * deg).filterIsInstance<Command.Rotate>().map { it.clockwise })
+        assertTrue("small wobble", twist(0f, 10 * deg).none { it is Command.Rotate })
     }
 
     @Test
@@ -118,12 +162,23 @@ class HandGestureRecognizerTest {
     }
 
     @Test
-    fun twoFingerSwipesAdjustVolumeAndSkipTracks() {
+    fun twoFingerSwipesSwipeTheScreenInAnyDirection() {
         fun two(dx: Float, dy: Float) = swipe(dx, dy, shape = Shape.PEACE)
-        assertEquals(listOf<Command>(Command.Volume(up = true)), two(0f, -0.3f))
-        assertEquals(listOf<Command>(Command.Volume(up = false)), two(0f, 0.3f))
-        assertEquals(listOf<Command>(Command.Media(MediaKind.PREVIOUS)), two(-0.3f, 0f))
-        assertEquals(listOf<Command>(Command.Media(MediaKind.NEXT)), two(0.3f, 0f))
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.UP)), two(0f, -0.3f))
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.DOWN)), two(0f, 0.3f))
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.LEFT)), two(-0.3f, 0f))
+        assertEquals(listOf<Command>(Command.Swipe(SwipeDir.RIGHT)), two(0.3f, 0f))
+    }
+
+    @Test
+    fun twoFingerSwipesCanStillBeBoundToVolumeAndTracks() {
+        val rec = HandGestureRecognizer()
+        rec.bindings = Bindings.DEFAULT
+            .with(GestureEvent.TWO_FINGER_SWIPE_UP, Command.Volume(up = true))
+            .with(GestureEvent.TWO_FINGER_SWIPE_RIGHT, Command.Media(MediaKind.NEXT))
+        assertEquals(listOf<Command>(Command.Volume(up = true)), swipe(0f, -0.3f, shape = Shape.PEACE, rec = rec))
+        val rec2 = HandGestureRecognizer().also { it.bindings = rec.bindings }
+        assertEquals(listOf<Command>(Command.Media(MediaKind.NEXT)), swipe(0.3f, 0f, shape = Shape.PEACE, rec = rec2))
     }
 
     @Test

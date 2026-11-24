@@ -35,6 +35,16 @@ object TestHands {
         return lm
     }
 
+    /** Scale a hand about its index fingertip, like pushing the pointing finger toward the camera. */
+    fun pushed(lm: List<Pt>, factor: Float): List<Pt> {
+        val tip = lm[8]
+        return lm.map { Pt(tip.x + (it.x - tip.x) * factor, tip.y + (it.y - tip.y) * factor) }
+    }
+
+    /** Put the thumb tip [r] away from the index tip, at [angle] radians (image space, y down). */
+    fun thumbAt(lm: List<Pt>, r: Float, angle: Float): List<Pt> =
+        lm.toMutableList().also { it[4] = Pt(it[8].x - r * kotlin.math.cos(angle), it[8].y - r * kotlin.math.sin(angle)) }
+
     /** Shift a whole hand. */
     fun moved(lm: List<Pt>, dx: Float, dy: Float) = lm.map { Pt(it.x + dx, it.y + dy) }
 }

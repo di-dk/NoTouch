@@ -230,14 +230,15 @@ class MainActivity : Activity() {
         col.addView(text("Hand gestures (defaults)", 18f, bold = true))
         col.addView(text(
             "- Point with one finger: moves the pointer\n" +
-                "- Pinch thumb and index: tap\n" +
+                "- Push the pointing finger toward the camera: click\n" +
+                "- Thumb and index touching, then spread: zoom in (reverse: zoom out)\n" +
+                "- Thumb and index apart, twist: rotate\n" +
                 "- Open palm, swipe up / down: scroll\n" +
                 "- Open palm, swipe left: swipe left\n" +
                 "- Open palm, swipe right: Back\n" +
                 "- Open palm held still 1 s: Home\n" +
                 "- Fist held 1 s: Recents\n" +
-                "- Two fingers, swipe up / down: volume\n" +
-                "- Two fingers, swipe left / right: previous / next track",
+                "- Two fingers (index + middle), swipe any direction: swipe on screen",
         ))
         col.addView(text("Face gestures", 18f, bold = true))
         col.addView(text(

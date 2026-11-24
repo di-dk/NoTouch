@@ -19,12 +19,20 @@ object ActionCatalog {
         "Previous track" to Command.Media(MediaKind.PREVIOUS),
         "Volume up" to Command.Volume(up = true),
         "Volume down" to Command.Volume(up = false),
+        "Zoom in" to Command.Zoom(zoomIn = true, at = null),
+        "Zoom out" to Command.Zoom(zoomIn = false, at = null),
+        "Rotate clockwise" to Command.Rotate(clockwise = true, at = null),
+        "Rotate counterclockwise" to Command.Rotate(clockwise = false, at = null),
     )
 
     fun indexOf(command: Command?): Int = actions.indexOfFirst { it.second == command }.coerceAtLeast(0)
 
     val handGestures: List<Pair<GestureEvent, String>> = listOf(
-        GestureEvent.PINCH to "Pinch thumb and index",
+        GestureEvent.PUSH_CLICK to "Push pointing finger toward the camera (click)",
+        GestureEvent.ZOOM_IN to "Thumb and index touching, then spread apart",
+        GestureEvent.ZOOM_OUT to "Thumb and index apart, then touch together",
+        GestureEvent.ROTATE_CW to "Thumb and index apart, twist clockwise",
+        GestureEvent.ROTATE_CCW to "Thumb and index apart, twist counterclockwise",
         GestureEvent.PALM_SWIPE_UP to "Open palm, swipe up",
         GestureEvent.PALM_SWIPE_DOWN to "Open palm, swipe down",
         GestureEvent.PALM_SWIPE_LEFT to "Open palm, swipe left",

@@ -16,23 +16,32 @@ class BindingsTest {
         val b = Bindings.DEFAULT
             .with(GestureEvent.FIST_HOLD, Command.Media(MediaKind.PLAY_PAUSE))
             .with(GestureEvent.BLINK_HOLD, Command.Volume(up = false))
-            .with(GestureEvent.PINCH, null)
+            .with(GestureEvent.PUSH_CLICK, null)
         val back = Bindings.parse(b.serialize())
         GestureEvent.values().forEach { assertEquals("$it", b.commandFor(it), back.commandFor(it)) }
-        assertNull(back.commandFor(GestureEvent.PINCH))
+        assertNull(back.commandFor(GestureEvent.PUSH_CLICK))
     }
 
     @Test
     fun parseSkipsGarbage() {
-        val b = Bindings.parse("NOPE=tap;PINCH=wat;MOUTH_OPEN=global:HOME;broken;PALM_HOLD=swipe:SIDEWAYS")
+        val b = Bindings.parse("NOPE=tap;PUSH_CLICK=wat;MOUTH_OPEN=global:HOME;broken;PALM_HOLD=swipe:SIDEWAYS")
         assertEquals(Command.Global(GlobalKind.HOME), b.commandFor(GestureEvent.MOUTH_OPEN))
-        assertNull(b.commandFor(GestureEvent.PINCH))
-        assertNull(b.commandFor(GestureEvent.PALM_HOLD))
+        assertEquals("bad value keeps the default", Bindings.DEFAULT.commandFor(GestureEvent.PUSH_CLICK), b.commandFor(GestureEvent.PUSH_CLICK))
+        assertEquals(Bindings.DEFAULT.commandFor(GestureEvent.PALM_HOLD), b.commandFor(GestureEvent.PALM_HOLD))
+    }
+
+    @Test
+    fun aTableSavedBeforeNewGesturesExistStillGetsTheirDefaults() {
+        val old = Bindings.parse("MOUTH_OPEN=global:HOME")
+        assertEquals(Bindings.DEFAULT.commandFor(GestureEvent.ZOOM_IN), old.commandFor(GestureEvent.ZOOM_IN))
+        assertEquals(Bindings.DEFAULT.commandFor(GestureEvent.ROTATE_CW), old.commandFor(GestureEvent.ROTATE_CW))
     }
 
     @Test
     fun tapTakesTheSuppliedPosition() {
-        assertEquals(Command.Tap(Pt(0.2f, 0.3f)), Bindings.DEFAULT.resolve(GestureEvent.PINCH, Pt(0.2f, 0.3f)))
+        assertEquals(Command.Tap(Pt(0.2f, 0.3f)), Bindings.DEFAULT.resolve(GestureEvent.PUSH_CLICK, Pt(0.2f, 0.3f)))
+        assertEquals(Command.Zoom(true, Pt(0.2f, 0.3f)), Bindings.DEFAULT.resolve(GestureEvent.ZOOM_IN, Pt(0.2f, 0.3f)))
+        assertEquals(Command.Rotate(false, Pt(0.2f, 0.3f)), Bindings.DEFAULT.resolve(GestureEvent.ROTATE_CCW, Pt(0.2f, 0.3f)))
     }
 }
 

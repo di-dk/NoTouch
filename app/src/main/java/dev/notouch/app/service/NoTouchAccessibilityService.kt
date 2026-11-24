@@ -148,6 +148,8 @@ class NoTouchAccessibilityService : AccessibilityService() {
             )
             is Command.Swipe -> swipe(c.dir)
             is Command.Media -> media(c.kind)
+            is Command.Zoom -> zoom(c)
+            is Command.Rotate -> rotate(c)
             is Command.Volume -> audio.adjustStreamVolume(
                 AudioManager.STREAM_MUSIC,
                 if (c.up) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
@@ -184,6 +186,44 @@ class NoTouchAccessibilityService : AccessibilityService() {
             SwipeDir.RIGHT -> { path.moveTo(w * 0.2f, h * 0.5f); path.lineTo(w * 0.8f, h * 0.5f) }
         }
         dispatch(path, durationMs = 280)
+    }
+
+    /** Two fingers moving apart (zoom in) or together (zoom out) around the given point. */
+    private fun zoom(c: Command.Zoom) {
+        refreshScreenSize()
+        val cx = (c.at?.x ?: 0.5f) * screenW
+        val cy = (c.at?.y ?: 0.5f) * screenH
+        val far = minOf(0.3f * screenW, cx - 8f, screenW - cx - 8f).coerceAtLeast(40f)
+        val near = far * 0.2f
+        val (from, to) = if (c.zoomIn) near to far else far to near
+        fun finger(sign: Float) = Path().apply { moveTo(cx + sign * from, cy); lineTo(cx + sign * to, cy) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(finger(-1f), 0, 350))
+            .addStroke(GestureDescription.StrokeDescription(finger(1f), 0, 350))
+            .build()
+        dispatchGesture(gesture, null, null)
+    }
+
+    /** Two fingers on opposite sides of a point, both turning the same way through about 70 degrees. */
+    private fun rotate(c: Command.Rotate) {
+        refreshScreenSize()
+        val cx = (c.at?.x ?: 0.5f) * screenW
+        val cy = (c.at?.y ?: 0.5f) * screenH
+        val radius = minOf(0.2f * screenW, cx - 8f, screenW - cx - 8f, cy - 8f, screenH - cy - 8f).coerceAtLeast(40f)
+        val sweep = Math.toRadians(if (c.clockwise) 70.0 else -70.0)
+        fun finger(startAngle: Double) = Path().apply {
+            for (i in 0..12) {
+                val a = startAngle + sweep * i / 12
+                val x = cx + (radius * Math.cos(a)).toFloat()
+                val y = cy + (radius * Math.sin(a)).toFloat()
+                if (i == 0) moveTo(x, y) else lineTo(x, y)
+            }
+        }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(finger(0.0), 0, 400))
+            .addStroke(GestureDescription.StrokeDescription(finger(Math.PI), 0, 400))
+            .build()
+        dispatchGesture(gesture, null, null)
     }
 
     private fun dispatch(path: Path, durationMs: Long) {

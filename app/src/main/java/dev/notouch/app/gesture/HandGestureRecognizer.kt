@@ -1,6 +1,8 @@
 package dev.notouch.app.gesture
 
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
 
 enum class HandPose { PALM, PEACE, FIST, POINT, PINCH, OTHER }
 
@@ -8,7 +10,9 @@ enum class HandPose { PALM, PEACE, FIST, POINT, PINCH, OTHER }
  * Turns 21 hand landmarks per frame (MediaPipe layout, upright + mirrored) into commands.
  *
  *  - Point (index only)            -> moves the cursor
- *  - Pinch (thumb + index)         -> tap at the cursor
+ *  - Push the pointing finger toward the camera (hand grows quickly) -> click where the cursor was
+ *  - Thumb + index touch then spread / spread then touch -> zoom in / zoom out
+ *  - Thumb + index held apart and twisted                -> rotate clockwise / counterclockwise
  *  - Open palm, swipe up/down/left -> scroll / swipe on screen
  *  - Open palm, swipe right        -> Back
  *  - Open palm held still          -> Home
@@ -32,7 +36,12 @@ class HandGestureRecognizer {
     private var lastSwipeAt = Long.MIN_VALUE / 2
     private var trailPose = HandPose.OTHER
 
-    private val tapTrigger = HoldTrigger(0.5f, 0.5f, holdMs = TAP_CONFIRM_MS, cooldownMs = 600)
+    private val scaleHistory = ArrayDeque<Pair<Long, Float>>()
+    private val pinchHistory = ArrayDeque<Pair<Long, Float>>()
+    private var lastPushAt = Long.MIN_VALUE / 2
+    private val angleHistory = ArrayDeque<Triple<Long, Float, Float>>() // time, angle (rad), pinch ratio
+    private var lastZoomAt = Long.MIN_VALUE / 2
+    private var lastRotateAt = Long.MIN_VALUE / 2
     private val homeTrigger = HoldTrigger(0.5f, 0.5f, holdMs = HOLD_MS, cooldownMs = 1500)
     private val recentsTrigger = HoldTrigger(0.5f, 0.5f, holdMs = HOLD_MS, cooldownMs = 1500)
 
@@ -44,7 +53,8 @@ class HandGestureRecognizer {
         smoother.reset()
         cursorHistory.clear()
         palmTrail.clear()
-        tapTrigger.reset()
+        scaleHistory.clear()
+        pinchHistory.clear()
         homeTrigger.reset()
         recentsTrigger.reset()
     }
@@ -96,8 +106,64 @@ class HandGestureRecognizer {
             smoother.reset()
             cursorHistory.clear()
         }
-        if (tapTrigger.update(if (pose == HandPose.PINCH) 1f else 0f, t)) {
-            bindings.resolve(GestureEvent.PINCH, positionAt(t - TAP_LOOKBACK_MS) ?: cursor)?.let { commands += it }
+        // --- click: the pointing finger is pushed toward the camera, so the hand quickly looks bigger ---
+        if (pose == HandPose.POINT) {
+            scaleHistory.addLast(t to scale)
+            while (scaleHistory.isNotEmpty() && t - scaleHistory.first().first > PUSH_WINDOW_MS) scaleHistory.removeFirst()
+            val smallest = scaleHistory.minOf { it.second }
+            val before = positionAt(t - PUSH_WINDOW_MS)
+            val travel = if (before != null && cursor != null) before.dist(cursor) else 0f
+            if (scale >= PUSH_RATIO * smallest && travel <= PUSH_MAX_TRAVEL && t - lastPushAt > PUSH_COOLDOWN_MS) {
+                bindings.resolve(GestureEvent.PUSH_CLICK, positionAt(t - PUSH_LOOKBACK_MS) ?: cursor)?.let { commands += it }
+                lastPushAt = t
+                scaleHistory.clear()
+            }
+        } else {
+            scaleHistory.clear()
+        }
+
+        // --- zoom: thumb and index touch then open (zoom in) or open then touch (zoom out) ---------------
+        if (index && othersCurled) {
+            pinchHistory.addLast(t to pinchRatio)
+            while (pinchHistory.isNotEmpty() && t - pinchHistory.first().first > ZOOM_WINDOW_MS) pinchHistory.removeFirst()
+            if (t - lastZoomAt > ZOOM_COOLDOWN_MS) {
+                val lowest = pinchHistory.minOf { it.second }
+                val highest = pinchHistory.maxOf { it.second }
+                val event = when {
+                    pinchRatio >= ZOOM_OPEN && lowest <= PINCH_ENTER -> GestureEvent.ZOOM_IN
+                    pinchRatio <= PINCH_ENTER && highest >= ZOOM_OPEN -> GestureEvent.ZOOM_OUT
+                    else -> null
+                }
+                if (event != null) {
+                    bindings.resolve(event, cursor ?: positionAt(t))?.let { commands += it }
+                    lastZoomAt = t
+                    pinchHistory.clear()
+                }
+            }
+
+            // --- rotate: the thumb-to-index line turns while the two stay roughly the same distance apart ---
+            val angle = atan2(lm[INDEX_TIP].y - lm[THUMB_TIP].y, lm[INDEX_TIP].x - lm[THUMB_TIP].x)
+            angleHistory.addLast(Triple(t, angle, pinchRatio))
+            while (angleHistory.isNotEmpty() && t - angleHistory.first().first > ROTATE_WINDOW_MS) angleHistory.removeFirst()
+            if (pinchRatio >= ROTATE_MIN_OPEN && t - lastRotateAt > ROTATE_COOLDOWN_MS && angleHistory.size >= 3) {
+                val ratios = angleHistory.map { it.third }
+                if (ratios.min() >= ROTATE_MIN_OPEN && ratios.max() - ratios.min() <= ROTATE_MAX_RATIO_CHANGE) {
+                    var turn = angle - angleHistory.first().second
+                    while (turn > PI) turn -= (2 * PI).toFloat()
+                    while (turn < -PI) turn += (2 * PI).toFloat()
+                    if (abs(turn) >= ROTATE_MIN_RAD) {
+                        val event = if (turn > 0) GestureEvent.ROTATE_CW else GestureEvent.ROTATE_CCW
+                        bindings.resolve(event, cursor ?: positionAt(t))?.let { commands += it }
+                        lastRotateAt = t
+                        angleHistory.clear()
+                    }
+                }
+            } else if (pinchRatio < ROTATE_MIN_OPEN) {
+                angleHistory.clear()
+            }
+        } else {
+            pinchHistory.clear()
+            angleHistory.clear()
         }
 
         // --- palm: swipe + hold -----------------------------------------------------------
@@ -193,8 +259,19 @@ class HandGestureRecognizer {
         const val MIN_PINCH_REACH = 1.1f
         const val MARGIN_X = 0.15f
         const val MARGIN_Y = 0.20f
-        const val TAP_CONFIRM_MS = 60L
-        const val TAP_LOOKBACK_MS = 250L
+        const val PUSH_WINDOW_MS = 300L
+        const val PUSH_LOOKBACK_MS = 250L
+        const val PUSH_RATIO = 1.18f
+        const val PUSH_MAX_TRAVEL = 0.15f
+        const val PUSH_COOLDOWN_MS = 700L
+        const val ZOOM_WINDOW_MS = 900L
+        const val ZOOM_OPEN = 0.9f
+        const val ZOOM_COOLDOWN_MS = 800L
+        const val ROTATE_WINDOW_MS = 700L
+        const val ROTATE_MIN_OPEN = 0.6f
+        const val ROTATE_MAX_RATIO_CHANGE = 0.3f
+        const val ROTATE_MIN_RAD = 0.7f // about 40 degrees
+        const val ROTATE_COOLDOWN_MS = 900L
         const val TRAIL_MS = 450L
         const val MIN_SWIPE_SPAN_MS = 120L
         const val MIN_SWIPE_DIST = 0.18f
