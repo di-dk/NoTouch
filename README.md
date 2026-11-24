@@ -22,7 +22,9 @@ NoTouch is an Android accessibility service. It watches the front camera with [M
 - **Face and head mode**: move your head to move the cursor, then open your mouth, raise eyebrows, smile, pucker or blink to trigger actions.
 - **Both mode** combines the two.
 - **Media and volume**: bind any gesture to play/pause, next, previous or volume.
-- **Remappable gestures**: every gesture is bound to an action through a saved table (screen to edit it is planned; defaults below).
+- **Remappable gestures**: **Customize gesture actions** lets you bind every gesture to tap, Back, Home, Recents, notifications, swipes in 8 directions, media, volume, zoom or rotate.
+- **Per-app gestures and auto-start**: give an app its own gesture actions, and start the camera gestures automatically when it opens (Android may block starting the camera from the background).
+- **Status at a glance**: setup buttons turn green, orange or red, and the app tells you when Android has stopped the accessibility service.
 - **Works in any app**: taps, swipes, Back, Home and Recents are injected through an accessibility service.
 - **On-screen pointer** so you can see where a tap will land.
 - **Adjustable sensitivity**, optional experimental GPU inference, and a live camera preview for debugging.
@@ -116,7 +118,7 @@ Front camera (CameraX)
 - The `INTERNET` and `ACCESS_NETWORK_STATE` permissions are explicitly removed in the manifest, so the app cannot go online.
 - Models ship inside the APK; nothing is downloaded.
 - Backups are disabled (`allowBackup="false"`).
-- The accessibility service performs gestures only and does not read screen content.
+- The accessibility service performs gestures. It also notes which app is in front (its package name only) for per-app gestures and auto-start. It does not read screen content.
 
 ## Limitations
 
