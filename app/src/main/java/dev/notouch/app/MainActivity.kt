@@ -217,8 +217,13 @@ class MainActivity : Activity() {
         col.addView(liveCheck)
         col.addView(liveView)
 
-        // cheat sheet
-        col.addView(text("Hand gestures", 18f, bold = true))
+        col.addView(Button(this).apply {
+            text = "Customize gesture actions"
+            setOnClickListener { startActivity(Intent(this@MainActivity, BindingsActivity::class.java)) }
+        })
+
+        // cheat sheet (shows the default actions; use "Customize gesture actions" to change them)
+        col.addView(text("Hand gestures (defaults)", 18f, bold = true))
         col.addView(text(
             "- Point with one finger: moves the pointer\n" +
                 "- Pinch thumb and index: tap\n" +
@@ -226,7 +231,9 @@ class MainActivity : Activity() {
                 "- Open palm, swipe left: swipe left\n" +
                 "- Open palm, swipe right: Back\n" +
                 "- Open palm held still 1 s: Home\n" +
-                "- Fist held 1 s: Recents",
+                "- Fist held 1 s: Recents\n" +
+                "- Two fingers, swipe up / down: volume\n" +
+                "- Two fingers, swipe left / right: previous / next track",
         ))
         col.addView(text("Face gestures", 18f, bold = true))
         col.addView(text(

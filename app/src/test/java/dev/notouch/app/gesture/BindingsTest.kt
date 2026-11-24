@@ -35,3 +35,15 @@ class BindingsTest {
         assertEquals(Command.Tap(Pt(0.2f, 0.3f)), Bindings.DEFAULT.resolve(GestureEvent.PINCH, Pt(0.2f, 0.3f)))
     }
 }
+
+class ActionCatalogTest {
+    @Test
+    fun everyEventIsEditableAndEveryDefaultIsOffered() {
+        val listed = (ActionCatalog.handGestures + ActionCatalog.faceGestures).map { it.first }.toSet()
+        assertEquals(GestureEvent.values().toSet(), listed)
+        GestureEvent.values().forEach {
+            val cmd = Bindings.DEFAULT.commandFor(it)
+            assertEquals("$it", cmd, ActionCatalog.actions[ActionCatalog.indexOf(cmd)].second)
+        }
+    }
+}

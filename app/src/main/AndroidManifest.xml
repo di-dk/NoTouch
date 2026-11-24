@@ -30,6 +30,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".BindingsActivity"
+            android:exported="false" />
+
         <service
             android:name=".service.CameraGestureService"
             android:exported="false"
