@@ -21,6 +21,8 @@ NoTouch is an Android accessibility service. It watches the front camera with [M
 - **Hand mode**: point to move a cursor, pinch to tap, swipe an open palm to scroll or go Back.
 - **Face and head mode**: move your head to move the cursor, then open your mouth, raise eyebrows, smile, pucker or blink to trigger actions.
 - **Both mode** combines the two.
+- **Media and volume**: two-finger swipes change volume and skip tracks.
+- **Remappable gestures**: every gesture is bound to an action through a saved table (screen to edit it is planned; defaults below).
 - **Works in any app**: taps, swipes, Back, Home and Recents are injected through an accessibility service.
 - **On-screen pointer** so you can see where a tap will land.
 - **Adjustable sensitivity**, optional experimental GPU inference, and a live camera preview for debugging.
@@ -39,6 +41,8 @@ NoTouch is an Android accessibility service. It watches the front camera with [M
 | Open palm, swipe right | Back |
 | Open palm, hold still about 1 s | Home |
 | Closed fist, hold about 1 s | Recents |
+| Two fingers (index + middle), swipe up or down | Volume up or down |
+| Two fingers, swipe left or right | Previous or next track |
 
 ### Face and head
 
